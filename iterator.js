@@ -11,51 +11,51 @@ const SECTIONS = ['custom', 'type', 'import', 'function', 'table', 'memory', 'gl
  * append entries to a given section
  */
 module.exports = class ModuleIterator {
-  /**
-   * param {Buffer} wasm - a webassembly binary
-   */
-  constructor (wasm) {
-    this._wasm = wasm
-    this._sections = []
-    this._modified = false
-  }
-
-  /**
-   * if the orignal wasm module was modified then this will return the modified
-   * wasm module
-   */
-  get wasm () {
-    if (this._modified) {
-      this._wasm = Buffer.concat(this._sections.concat(this._pipe.buffer))
-      this._modified = false
+    /**
+     * param {Buffer} wasm - a webassembly binary
+     */
+    constructor(wasm) {
+        this._wasm = wasm
+        this._sections = []
+        this._modified = false
     }
-    return this._wasm
-  }
 
-  /**
-   * Iterates through the module's sections
-   * return {Iterator.<Section>}
-   */
-  * [Symbol.iterator] () {
-    this._pipe = new Pipe(this._wasm)
-    this._sections = [this._pipe.read(8)]
-    while (!this._pipe.end) {
-      const start = this._pipe.bytesRead
-      const sectionType = this._pipe.read(1)[0]
-      const size = Number(leb128.read(this._pipe))
-      const body = this._pipe.read(size)
-      const end = this._pipe.bytesRead
-      const section = this._wasm.slice(start, end)
-      const index = this._sections.push(section) - 1
-
-      yield new Section(sectionType, body, this, index)
+    /**
+     * if the orignal wasm module was modified then this will return the modified
+     * wasm module
+     */
+    get wasm() {
+        if (this._modified) {
+            this._wasm = Buffer.concat(this._sections.concat(this._pipe.buffer))
+            this._modified = false
+        }
+        return this._wasm
     }
-  }
 
-  _update (index, data) {
-    this._modified = true
-    this._sections[index] = data
-  }
+    /**
+     * Iterates through the module's sections
+     * return {Iterator.<Section>}
+     */
+    * [Symbol.iterator]() {
+        this._pipe = new Pipe(this._wasm)
+        this._sections = [this._pipe.read(8)]
+        while (!this._pipe.end) {
+            const start = this._pipe.bytesRead
+            const sectionType = this._pipe.read(1)[0]
+            const size = Number(leb128.read(this._pipe))
+            const body = this._pipe.read(size)
+            const end = this._pipe.bytesRead
+            const section = this._wasm.slice(start, end)
+            const index = this._sections.push(section) - 1
+
+            yield new Section(sectionType, body, this, index)
+        }
+    }
+
+    _update(index, data) {
+        this._modified = true
+        this._sections[index] = data
+    }
 }
 
 /**
@@ -63,49 +63,49 @@ module.exports = class ModuleIterator {
  * through the Module's iternator
  */
 class Section {
-  constructor (sectionType, section, it, index) {
-    this._it = it
-    this._index = index
-    this.type = SECTIONS[sectionType]
-    this._type = sectionType
-    this._section = section
+    constructor(sectionType, section, it, index) {
+        this._it = it
+        this._index = index
+        this.type = SECTIONS[sectionType]
+        this._type = sectionType
+        this._section = section
 
-    const pipe = new Pipe(section)
-    if (this.type !== 'custom') {
-      this.count = Number(leb128.read(pipe))
+        const pipe = new Pipe(section)
+        if (this.type !== 'custom') {
+            this.count = Number(leb128.read(pipe))
+        }
+        this._body = pipe.buffer
     }
-    this._body = pipe.buffer
-  }
 
-  /**
-   * Parses the section and return the JSON repesentation of it
-   * returns {Object}
-   */
-  toJSON () {
-    return wasm2json.sectionParsers[this.type](new Pipe(this._section))
-  }
+    /**
+     * Parses the section and return the JSON repesentation of it
+     * returns {Object}
+     */
+    toJSON() {
+        return wasm2json.sectionParsers[this.type](new Pipe(this._section))
+    }
 
-  /**
-   * Appends an array of entries to this section. NOTE: this will modify the
-   * parent wasm module.
-   * @param {Arrayy.<Buffer>} entries
-   */
-  appendEntries (entries) {
-    this.count += entries.length
-    this._body = Buffer.concat([
-      this._body
-    ].concat(entries))
+    /**
+     * Appends an array of entries to this section. NOTE: this will modify the
+     * parent wasm module.
+     * @param {Arrayy.<Buffer>} entries
+     */
+    appendEntries(entries) {
+        this.count += entries.length
+        this._body = Buffer.concat([
+            this._body
+        ].concat(entries))
 
-    const bodyAndCount = Buffer.concat([
-      leb128.encode(this.count),
-      this._body
-    ])
+        const bodyAndCount = Buffer.concat([
+            leb128.encode(this.count),
+            this._body
+        ])
 
-    // encode length has save modifed section
-    this._it._update(this._index, Buffer.concat([
-      Buffer.from([this._type]),
-      leb128.encode(bodyAndCount.length),
-      bodyAndCount
-    ]))
-  }
+        // encode length has save modifed section
+        this._it._update(this._index, Buffer.concat([
+            Buffer.from([this._type]),
+            leb128.encode(bodyAndCount.length),
+            bodyAndCount
+        ]))
+    }
 }
