@@ -1,5 +1,5 @@
 {
-  "name": "wasm-json-toolkit",
+  "name": "@btc-vision/wasm-json-toolkit",
   "version": "0.3.0",
   "description": "this convertes wasm binaries to json and json to wasm binaries",
   "main": "index.js",
